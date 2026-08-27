@@ -1,5 +1,16 @@
 name: publish
 
+# Publishing uses npm trusted publishing, so no token is stored anywhere. The
+# registry trusts this workflow in this repository through OIDC, and provenance
+# is attached automatically.
+#
+# One time setup, on npmjs.com: Packages -> supercompact -> Settings ->
+# Trusted Publisher -> GitHub Actions, owner SignedAdam, repository
+# supercompact, workflow file publish.yml, allow publish. It needs an
+# interactive 2FA approval, so it cannot be scripted.
+#
+# Then a release is: npm version patch|minor|major && git push --follow-tags
+
 on:
   push:
     tags: ["v*"]
@@ -17,8 +28,21 @@ jobs:
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
+
+      # setup-node pins npm 10, which has no OIDC support. Trusted publishing
+      # needs 11.5.1 or newer.
+      - run: npm install -g npm@latest
+
       - run: npm install
       - run: npm run check
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Refuse to publish a tag that disagrees with package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          if [ "$tag" != "$pkg" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package.json $pkg"
+            exit 1
+          fi
+
+      - run: npm publish --access public

@@ -1,37 +1,14 @@
-```
-███████╗██╗   ██╗██████╗ ███████╗██████╗
-██╔════╝██║   ██║██╔══██╗██╔════╝██╔══██╗
-███████╗██║   ██║██████╔╝█████╗  ██████╔╝
-╚════██║██║   ██║██╔═══╝ ██╔══╝  ██╔══██╗
-███████║╚██████╔╝██║     ███████╗██║  ██║
-╚══════╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝
- ██████╗ ██████╗ ███╗   ███╗██████╗  █████╗  ██████╗████████╗
-██╔════╝██╔═══██╗████╗ ████║██╔══██╗██╔══██╗██╔════╝╚══██╔══╝
-██║     ██║   ██║██╔████╔██║██████╔╝███████║██║        ██║
-██║     ██║   ██║██║╚██╔╝██║██╔═══╝ ██╔══██║██║        ██║
-╚██████╗╚██████╔╝██║ ╚═╝ ██║██║     ██║  ██║╚██████╗   ██║
- ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚═╝  ╚═╝ ╚═════╝   ╚═╝
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SignedAdam/supercompact/main/docs/demo.svg" alt="npx supercompact measure running against 3289 real Claude Code sessions" width="590">
+</p>
 
-╭────────────────────────────────────────────────────────────────╮
-│ a4abe3a1   274k tokens   before supercompact                   │
-├────────────────────────────────────────────────────────────────┤
-│ tool traffic      ████████████████████           68%           │
-│ starting context  ██████                         21%           │
-│ you and Claude    ███                            11%           │
-╰────────────────────────────────────────────────────────────────╯
-                                 │
-                                 ▼
-╭────────────────────────────────────────────────────────────────╮
-│ a4abe3a1    87k tokens   same id, same resume                  │
-│ every message kept character for character · no model used     │
-╰────────────────────────────────────────────────────────────────╯
-```
-
-[![npm](https://img.shields.io/npm/v/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=NPM)](https://www.npmjs.com/package/supercompact)
-[![checks](https://img.shields.io/github/actions/workflow/status/SignedAdam/supercompact/check.yml?branch=main&style=for-the-badge&color=C8FF00&labelColor=000000&label=48%20CHECKS)](https://github.com/SignedAdam/supercompact/actions/workflows/check.yml)
-[![node](https://img.shields.io/node/v/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=NODE)](https://nodejs.org)
-[![dependencies](https://img.shields.io/badge/RUNTIME%20DEPS-0-C8FF00?style=for-the-badge&labelColor=000000)](package.json)
-[![license](https://img.shields.io/npm/l/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=LICENSE)](LICENSE)
+<p align="center">
+<a href="https://www.npmjs.com/package/supercompact"><img src="https://img.shields.io/npm/v/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=NPM" alt="npm version"></a>
+<a href="https://github.com/SignedAdam/supercompact/actions/workflows/check.yml"><img src="https://img.shields.io/github/actions/workflow/status/SignedAdam/supercompact/check.yml?branch=main&style=for-the-badge&color=C8FF00&labelColor=000000&label=48%20CHECKS" alt="checks"></a>
+<a href="https://nodejs.org"><img src="https://img.shields.io/node/v/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=NODE" alt="node"></a>
+<a href="package.json"><img src="https://img.shields.io/badge/RUNTIME%20DEPS-0-C8FF00?style=for-the-badge&labelColor=000000" alt="zero runtime dependencies"></a>
+<a href="LICENSE"><img src="https://img.shields.io/npm/l/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=LICENSE" alt="MIT license"></a>
+</p>
 
 Up to 95% of the tokens in a heavy Claude Code session are tool traffic. `supercompact` strips that traffic out of the transcript on disk and gives you back the context window.
 

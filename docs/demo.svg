@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="590" height="458" viewBox="0 0 590 458" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">
+<style>
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes blink{50%{opacity:0}}
+.ln{animation:fade .3s ease-out both}
+.bar{transform-origin:330px 0;animation:grow .85s cubic-bezier(.2,.85,.25,1) both}
+.type{transform-origin:42px 0;animation:grow 1.15s steps(24) both}
+.cur{animation:blink 1.05s steps(1) infinite}
+</style>
+<rect width="590" height="458" rx="11" fill="#0b0f14"/>
+<path d="M0 11a11 11 0 0 1 11-11h568a11 11 0 0 1 11 11v28H0z" fill="#151b23"/>
+<circle cx="21" cy="20" r="5.5" fill="#ff5f57"/>
+<circle cx="40" cy="20" r="5.5" fill="#febc2e"/>
+<circle cx="59" cy="20" r="5.5" fill="#28c840"/>
+<text x="295.0" y="25" fill="#78879a" font-size="12" text-anchor="middle">supercompact</text>
+<text x="26" y="66" fill="#c8ff00">$</text>
+<clipPath id="t"><rect class="type" x="42" y="51" height="21" width="200"/></clipPath>
+<g clip-path="url(#t)"><text x="42" y="66" fill="#d7e0ea">npx supercompact measure</text></g>
+<text class="ln" style="animation-delay:1.65s" x="26" y="112" fill="#d7e0ea">3289 sessions, 365.5M tokens of context</text>
+<g class="ln" style="animation-delay:1.85s">
+<text x="26" y="158" fill="#d7e0ea">removed</text>
+<text x="250" y="158" fill="#78879a" text-anchor="end">229.3M</text>
+<text x="310" y="158" fill="#d7e0ea" text-anchor="end">63%</text>
+</g>
+<rect class="bar" style="animation-delay:1.97s" x="330" y="149" width="144" height="10" rx="2" fill="#5b6c80"/>
+<g class="ln" style="animation-delay:1.95s">
+<text x="26" y="181" fill="#d7e0ea">starting context</text>
+<text x="250" y="181" fill="#78879a" text-anchor="end">112.3M</text>
+<text x="310" y="181" fill="#d7e0ea" text-anchor="end">31%</text>
+</g>
+<rect class="bar" style="animation-delay:2.07s" x="330" y="172" width="71" height="10" rx="2" fill="#3d4b5c"/>
+<g class="ln" style="animation-delay:2.05s">
+<text x="26" y="204" fill="#d7e0ea">kept verbatim</text>
+<text x="250" y="204" fill="#78879a" text-anchor="end">24.0M</text>
+<text x="310" y="204" fill="#d7e0ea" text-anchor="end">7%</text>
+</g>
+<rect class="bar" style="animation-delay:2.17s" x="330" y="195" width="16" height="10" rx="2" fill="#c8ff00"/>
+<text class="ln" style="animation-delay:2.25s" x="26" y="250" fill="#78879a">removed is tool calls and their results</text>
+<text class="ln" style="animation-delay:2.35s" x="26" y="273" fill="#78879a">kept verbatim is every message you and Claude sent</text>
+<text class="ln" style="animation-delay:2.55s" x="26" y="319" fill="#d7e0ea">436 of your sessions passed 200k tokens.</text>
+<text class="ln" style="animation-delay:2.65s" x="26" y="342" fill="#d7e0ea">The middle one drops by 87%.</text>
+<text class="ln" style="animation-delay:2.85s" x="26" y="388" fill="#d7e0ea">Your heaviest session held 1.0M tokens.</text>
+<text class="ln" style="animation-delay:2.95s" x="26" y="411" fill="#d7e0ea">3k of it was the two of you talking.</text>
+<text class="ln" style="animation-delay:3.30s" x="26" y="434" fill="#c8ff00">$ <tspan class="cur">▊</tspan></text>
+</svg>
