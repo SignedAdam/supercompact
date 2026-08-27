@@ -530,16 +530,24 @@ async function runMeasure(args: Args): Promise<void> {
     say('');
     say('  your last 3 sessions');
     say('');
+    say(
+      '  ' +
+        'current context'.padStart(17) +
+        'after supercompaction'.padStart(23) +
+        'starting context'.padStart(18) +
+        'removed'.padStart(10),
+    );
     for (const row of recent) {
       const share = row.context === 0 ? 0 : row.removed / row.context;
+      // The full id, because the next thing someone does with it is paste it
+      // into a command.
+      say(`  ${row.id}`);
       say(
         '  ' +
-          row.id.slice(0, 8) +
-          tokens(row.context).padStart(8) +
-          ' → ' +
-          tokens(row.starting + row.kept).padStart(6) +
-          `  (${percent(share).trim().padStart(3)} removed)` +
-          `   left: ${tokens(row.starting)} starting, ${tokens(row.kept)} kept`,
+          tokens(row.context).padStart(17) +
+          tokens(row.starting + row.kept).padStart(23) +
+          tokens(row.starting).padStart(18) +
+          percent(share).padStart(10),
       );
     }
     const newest = recent[0];
