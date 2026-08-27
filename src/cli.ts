@@ -528,31 +528,25 @@ async function runMeasure(args: Args): Promise<void> {
   say('  kept verbatim is every message you and Claude sent.');
   if (recent.length > 0) {
     say('');
-    say(
-      '  ' +
-        'your last 3 sessions'.padEnd(30) +
-        'context'.padStart(9) +
-        'removed'.padStart(9) +
-        'starting'.padStart(9) +
-        'kept'.padStart(9) +
-        'drops by'.padStart(10),
-    );
+    say('  your last 3 sessions');
+    say('');
     for (const row of recent) {
+      const share = row.context === 0 ? 0 : row.removed / row.context;
       say(
         '  ' +
-          oneLine(row.name, 29).padEnd(30) +
-          tokens(row.context).padStart(9) +
-          tokens(row.removed).padStart(9) +
-          tokens(row.starting).padStart(9) +
-          tokens(row.kept).padStart(9) +
-          percent(row.context === 0 ? 0 : row.removed / row.context).padStart(10),
+          row.id.slice(0, 8) +
+          tokens(row.context).padStart(8) +
+          ' → ' +
+          tokens(row.starting + row.kept).padStart(6) +
+          `  (${percent(share).trim().padStart(3)} removed)` +
+          `   left: ${tokens(row.starting)} starting, ${tokens(row.kept)} kept`,
       );
     }
     const newest = recent[0];
     if (newest !== undefined && newest.starting > bloatedStartingContext) {
       say('');
       say(
-        `  These start with ${tokens(newest.starting)} already loaded. ` +
+        `  Your newest session starts with ${tokens(newest.starting)} already loaded. ` +
           '(You should fix this btw)',
       );
     }
