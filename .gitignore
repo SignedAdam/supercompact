@@ -1,9 +1,7 @@
 node_modules/
 dist/
 
-# Launch night, this machine only. Both hardcode local paths.
-scripts/publish.sh
-scripts/after-publish.sh
+# Launch tooling for this machine only; it hardcodes local paths.
 scripts/release.sh
 
 *.tgz

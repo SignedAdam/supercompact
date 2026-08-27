@@ -59,5 +59,9 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - if: steps.exists.outputs.published == 'false'
-        run: npm publish --access public
+      - name: Publish
+        if: steps.exists.outputs.published == 'false'
+        run: |
+          if npm publish --access public; then exit 0; fi
+          echo "::error::npm publish failed. If that was an authentication error, this repository is not yet registered as a trusted publisher, and there is no token here on purpose. Configure it once on npmjs.com: Packages -> supercompact -> Settings -> Trusted Publisher -> GitHub Actions, owner SignedAdam, repository supercompact, workflow publish.yml, allow publish. It needs an interactive 2FA approval, so it cannot be scripted. Until then, release from a laptop with scripts/release.sh."
+          exit 1
