@@ -1,7 +1,7 @@
 {
   "name": "supercompact",
   "version": "1.0.0",
-  "description": "Remove tool calls from Claude Code transcripts and keep the conversation resumable",
+  "description": "Cut up to 95% of tokens from Claude Code sessions without losing conversation history",
   "keywords": [
     "claude-code",
     "claude",

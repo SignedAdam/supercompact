@@ -1,6 +1,41 @@
-# supercompact
+```
+███████╗██╗   ██╗██████╗ ███████╗██████╗
+██╔════╝██║   ██║██╔══██╗██╔════╝██╔══██╗
+███████╗██║   ██║██████╔╝█████╗  ██████╔╝
+╚════██║██║   ██║██╔═══╝ ██╔══╝  ██╔══██╗
+███████║╚██████╔╝██║     ███████╗██║  ██║
+╚══════╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝
+ ██████╗ ██████╗ ███╗   ███╗██████╗  █████╗  ██████╗████████╗
+██╔════╝██╔═══██╗████╗ ████║██╔══██╗██╔══██╗██╔════╝╚══██╔══╝
+██║     ██║   ██║██╔████╔██║██████╔╝███████║██║        ██║
+██║     ██║   ██║██║╚██╔╝██║██╔═══╝ ██╔══██║██║        ██║
+╚██████╗╚██████╔╝██║ ╚═╝ ██║██║     ██║  ██║╚██████╗   ██║
+ ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚═╝  ╚═╝ ╚═════╝   ╚═╝
 
-`supercompact` removes tool calls and tool results from Claude Code sessions and leaves every conversation turn untouched.
+╭────────────────────────────────────────────────────────────────╮
+│ a4abe3a1   274k tokens   before supercompact                   │
+├────────────────────────────────────────────────────────────────┤
+│ tool traffic      ████████████████████           68%           │
+│ starting context  ██████                         21%           │
+│ you and Claude    ███                            11%           │
+╰────────────────────────────────────────────────────────────────╯
+                                 │
+                                 ▼
+╭────────────────────────────────────────────────────────────────╮
+│ a4abe3a1    87k tokens   same id, same resume                  │
+│ every message kept character for character · no model used     │
+╰────────────────────────────────────────────────────────────────╯
+```
+
+[![npm](https://img.shields.io/npm/v/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=NPM)](https://www.npmjs.com/package/supercompact)
+[![checks](https://img.shields.io/github/actions/workflow/status/SignedAdam/supercompact/check.yml?branch=main&style=for-the-badge&color=C8FF00&labelColor=000000&label=48%20CHECKS)](https://github.com/SignedAdam/supercompact/actions/workflows/check.yml)
+[![node](https://img.shields.io/node/v/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=NODE)](https://nodejs.org)
+[![dependencies](https://img.shields.io/badge/RUNTIME%20DEPS-0-C8FF00?style=for-the-badge&labelColor=000000)](package.json)
+[![license](https://img.shields.io/npm/l/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=LICENSE)](LICENSE)
+
+Up to 95% of the tokens in a heavy Claude Code session are tool traffic. `supercompact` strips that traffic out of the transcript on disk and gives you back the context window.
+
+Every human message stays. Every assistant response stays. There is no model summarising your conversation and no loss of detail. You keep everything you agreed on, lose the machine's scratch work, and resume the session right where you left off.
 
 Run this first. It reads your local sessions, calculates the token split across your history, and writes nothing:
 
@@ -39,13 +74,13 @@ npx supercompact measure
   Try it on this machine:  npx supercompact --preview
 ```
 
-## Why
+## Never throw away a session
 
-Tool traffic is almost everything in a Claude Code transcript. Files read, shell commands, test runs, and build logs account for roughly 95 percent of the variable tokens in a working session. The actual conversation is a small fraction of the file.
+Tool traffic is almost everything in a Claude Code transcript. Files read, shell commands, test runs, and build logs account for up to 95 percent of the variable tokens in a working session. The actual conversation is a fraction of the file.
 
-When a session fills up, the default move is to abandon it and start a new one. You throw away the context, re-explain the architecture, and start over.
+When a session gets heavy, the standard move is to abandon it and start over. You throw away the history, re-explain the architecture from scratch, and waste time catching the agent back up.
 
-I built this because I wanted long sessions that do not die. When you strip the tool calls, the session stops being disposable. You keep the agreements, the architectural decisions, and the conclusions the agent reached. The evidence is gone, but the context stays.
+I built this so sessions never have to die. When you strip the tool noise, the session stops being disposable. You keep the agreements, the architectural decisions, and the conclusions the agent reached. The evidence is gone, but the context stays.
 
 ## How this differs from `/compact`
 
