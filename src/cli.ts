@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { basename, dirname } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
 
 import { head, Transcript } from './transcript.js';
 import { fork, inPlace, messageCount, type Options, type Result } from './rewrite.js';
@@ -62,7 +62,12 @@ function parse(raw: string[]): Args {
       args.switches.add(name.slice(0, equals));
       continue;
     }
-    if (valued.has(name) && i + 1 < raw.length) {
+    if (valued.has(name)) {
+      // `--keep-last` with the number left off used to be accepted as a switch
+      // and quietly meant zero, which strips every tool result: the opposite of
+      // what the person asked for.
+      const next = raw[i + 1];
+      if (next === undefined) fail(`--${name} needs a value`);
       args.values.set(name, raw[++i]!);
       args.switches.add(name);
       continue;
@@ -128,8 +133,30 @@ function percent(share: number): string {
 
 // ── the session being acted on ──────────────────────────────────────────────
 
+/** Claude Code names a session folder from its own already-resolved cwd, so a
+ * path the user typed has to be resolved the same way or it can never match.
+ * On a mac /tmp and /var are symlinks, which is how this shows up in practice.
+ *
+ * The literal path stays as a fallback, because a folder can legitimately encode
+ * an unresolved path, and reporting "no sessions" at a path that holds them is
+ * worse than trying both. */
+function projectDir(given: string): string {
+  if (given === '') return process.cwd();
+  const candidates = [given];
+  try {
+    const real = realpathSync(given);
+    if (real !== given) candidates.unshift(real);
+  } catch {
+    candidates.unshift(resolve(given));
+  }
+  for (const dir of candidates) {
+    if (store.sessionFilesFor(dir).length > 0) return dir;
+  }
+  return given;
+}
+
 function open(args: Args): { transcript: Transcript; cwd: string } {
-  const here = value(args, 'project-dir') || process.cwd();
+  const here = projectDir(value(args, 'project-dir'));
   let path: string;
   try {
     const handle = args.positional[0];
@@ -563,10 +590,17 @@ async function runMeasure(args: Args): Promise<void> {
     }
   }
   say('');
-  say(
-    `  ${m.heavyShares.length} of your sessions passed ${tokens(heavyContext)} tokens. ` +
-      `The middle one drops by ${percent(heavyMedian).trim()}.`,
-  );
+  if (m.heavyShares.length > 0) {
+    say(
+      `  ${m.heavyShares.length} of your sessions passed ${tokens(heavyContext)} tokens. ` +
+        `The middle one drops by ${percent(heavyMedian).trim()}.`,
+    );
+  } else {
+    say(
+      `  None of your sessions have passed ${tokens(heavyContext)} tokens yet, ` +
+        'so there is not much here to give back.',
+    );
+  }
   if (m.heaviest !== undefined) {
     say(
       `  Your heaviest session held ${tokens(m.heaviest.context)} tokens. ` +
@@ -583,13 +617,25 @@ async function runMeasure(args: Args): Promise<void> {
 
 function runList(args: Args): void {
   const limit = number(args, 'limit') || 20;
-  const paths = store
-    .allSessionFiles()
-    .sort((a, b) => store.modified(b) - store.modified(a));
+  const scoped = has(args, 'project-dir');
+  const where = scoped ? projectDir(value(args, 'project-dir')) : '';
+  const paths = (scoped ? store.sessionFilesFor(where) : store.allSessionFiles()).sort(
+    (a, b) => store.modified(b) - store.modified(a),
+  );
 
-  let shown = 0;
+  const rows: {
+    sessionId: string;
+    title: string;
+    users: number;
+    assistants: number;
+    toolCalls: number;
+    bytes: number;
+    modified: string;
+    cwd: string;
+  }[] = [];
+
   for (const path of paths) {
-    if (shown >= limit) break;
+    if (rows.length >= limit) break;
     let transcript: Transcript;
     try {
       transcript = new Transcript(path);
@@ -599,19 +645,32 @@ function runList(args: Args): void {
     const counts = transcript.counts();
     if (counts.users === 0) continue;
 
-    const title =
-      store.titleOf(transcript.id, transcript.directory) || transcript.firstPrompt || 'untitled';
-    say(`[${transcript.id.slice(0, 8)}]  ${oneLine(title, 64)}`);
-    say(
-      `  ${counts.users} from you, ${counts.assistants} from Claude, ` +
-        `${counts.calls} tool calls, ${size(transcript.bytes)}, ${ago(store.modified(path))}`,
-    );
-    if (transcript.cwd !== '') say(`  ${transcript.cwd}`);
-    say('');
-    shown++;
+    rows.push({
+      sessionId: transcript.id,
+      title:
+        store.titleOf(transcript.id, transcript.directory) || transcript.firstPrompt || 'untitled',
+      users: counts.users,
+      assistants: counts.assistants,
+      toolCalls: counts.calls,
+      bytes: transcript.bytes,
+      modified: new Date(store.modified(path)).toISOString(),
+      cwd: transcript.cwd,
+    });
   }
 
-  if (shown === 0) say(`no sessions found under ${store.root()}`);
+  if (has(args, 'json')) return print({ sessions: rows });
+
+  for (const row of rows) {
+    say(`[${row.sessionId.slice(0, 8)}]  ${oneLine(row.title, 64)}`);
+    say(
+      `  ${row.users} from you, ${row.assistants} from Claude, ` +
+        `${row.toolCalls} tool calls, ${size(row.bytes)}, ${ago(Date.parse(row.modified))}`,
+    );
+    if (row.cwd !== '') say(`  ${row.cwd}`);
+    say('');
+  }
+
+  if (rows.length === 0) say(`no sessions found under ${scoped ? where : store.root()}`);
 }
 
 function ago(at: number): string {
@@ -690,6 +749,13 @@ async function main(): Promise<void> {
   }
 
   const args = parse(argv);
+
+  // An extra word is always a mistake worth stopping on. A single unknown word
+  // is left to the session lookup, which already names it.
+  if (args.positional.length > 1) {
+    fail(`too many arguments: ${args.positional.slice(1).join(' ')}`);
+  }
+
   if (has(args, 'preview')) return runPreview(args);
   if (has(args, 'in-place')) return runInPlace(args);
   return runCopy(args);

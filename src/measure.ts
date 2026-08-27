@@ -126,9 +126,6 @@ export async function measure(
       m.dialogue += size.dialogue;
       m.starting += size.starting;
       m.sizes.push(size);
-      const share = reclaimable(size) / size.context;
-      m.shares.push(share);
-      if (size.context >= heavyContext) m.heavyShares.push(share);
       if (
         size.context >= exampleContext &&
         size.dialogue > 0 &&
@@ -140,6 +137,23 @@ export async function measure(
   }
 
   await Promise.all(Array.from({ length: Math.min(width, paths.length) }, worker));
+
+  // A session whose opening request was too large to trust reports a starting
+  // context of 0, and subtracting nothing would score it as almost entirely
+  // reclaimable. No session gives back all of its context, so stand in the
+  // middle of the figures we do trust rather than publish an impossible share.
+  const known = m.sizes.filter((size) => size.starting > 0).map((size) => size.starting);
+  known.sort((a, b) => a - b);
+  const typical = known.length === 0 ? 0 : known[Math.floor(known.length / 2)]!;
+
+  for (const size of m.sizes) {
+    const starting = size.starting > 0 ? size.starting : typical;
+    const room = Math.max(0, size.context - size.dialogue - starting);
+    const share = size.context === 0 ? 0 : room / size.context;
+    m.shares.push(share);
+    if (size.context >= heavyContext) m.heavyShares.push(share);
+  }
+
   m.shares.sort((a, b) => a - b);
   m.heavyShares.sort((a, b) => a - b);
   return m;
@@ -167,8 +181,13 @@ export async function measureOne(path: string): Promise<SessionSize | undefined>
       continue;
     }
 
-    const isUser = line.includes('"type":"user"');
-    const isAssistant = !isUser && line.includes('"type":"assistant"');
+    // A substring test on the compact form is what makes measure fast enough to
+    // walk thousands of files, but a pretty-printed session would slip past it
+    // and be reported as having no sizes at all, so allow the space too.
+    const isUser = line.includes('"type":"user"') || line.includes('"type": "user"');
+    const isAssistant =
+      !isUser &&
+      (line.includes('"type":"assistant"') || line.includes('"type": "assistant"'));
     if (!isUser && !isAssistant) continue;
 
     if (isUser && line.includes('"tool_result"')) {

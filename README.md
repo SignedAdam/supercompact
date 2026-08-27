@@ -178,6 +178,6 @@ The skill lets Claude Code measure its own transcript and strip tool traffic aut
 
 - Node.js 18 or higher. Tested on Node 18 and 22 in CI.
 - Zero runtime dependencies.
-- 51 tests run against throwaway session trees in CI on macOS and Ubuntu.
+- 57 tests run against throwaway session trees in CI on macOS and Ubuntu.
 - Windows is untested.
 - MIT license. Author Adam Albastov. Source code on [GitHub](https://github.com/SignedAdam/supercompact).

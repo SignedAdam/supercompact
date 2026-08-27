@@ -1,7 +1,7 @@
 ---
 description: Remove the tool calls and results from this conversation, keep the messages
 argument-hint: "[tools] [keep N] [preview]"
-allowed-tools: Bash(supercompact:*)
+allowed-tools: Bash(supercompact:*), Bash(npx:*)
 ---
 
 Shrink the conversation we are in right now.
@@ -15,6 +15,9 @@ writes a new session instead.
 ```
 supercompact --in-place [--tools] [--keep-last N] [--preview]
 ```
+
+If `supercompact` is not on the PATH, the same command works through
+`npx supercompact`. Do not install anything to work around it.
 
 Report three things:
 

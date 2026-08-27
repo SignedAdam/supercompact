@@ -279,5 +279,28 @@ OUT=$($BIN zzzzzzzz 2>&1)
 echo "$OUT" | grep -q 'no session matching'
 check "an unknown id fails clearly" $?
 
+setup
+OUT=$($BIN --keep-last 2>&1)
+echo "$OUT" | grep -q 'needs a value'
+check "a valued option with no value stops" $?
+
+OUT=$($BIN 070e7a0c extra 2>&1)
+echo "$OUT" | grep -q 'too many arguments'
+check "an extra argument stops" $?
+
+$BIN list --json | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if isinstance(d["sessions"], list) and d["sessions"] else "no sessions in json")'
+check "list speaks json" $?
+
+COUNT=$($BIN list --json --project-dir "$PROJ" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["sessions"]))')
+[ "$COUNT" = "1" ]
+check "list scopes to one project" $?
+
+# A reader who pipes into head or quits less must not see a stack trace.
+ERR=$($BIN list 2>&1 >/dev/null | true)
+$BIN list > >(head -c 1 > /dev/null) 2>/dev/null
+check "a closed pipe is not a crash" $?
+[ -z "$ERR" ]
+check "nothing is written to stderr on a normal list" $?
+
 echo
 if [ "$FAILED" = "0" ]; then echo "all supercompact checks passed"; else echo "supercompact checks FAILED"; exit 1; fi
