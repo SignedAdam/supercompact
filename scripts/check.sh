@@ -167,6 +167,13 @@ check "measure --json reports what could be given back" $?
 echo "$OUT" | grep -q '"startingContextTokens"'
 check "measure --json separates the starting context" $?
 
+echo "$OUT" | grep -q '"recent"'
+check "measure --json lists the newest sessions on their own" $?
+
+OUT=$($BIN measure 2>&1)
+echo "$OUT" | grep -q 'your last 3 sessions'
+check "measure breaks out the newest sessions" $?
+
 # --- typos do not pass quietly ---
 setup
 OUT=$($BIN 070e7a0c --keep-tool 5 2>&1)

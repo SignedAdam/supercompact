@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { basename, dirname } from 'node:path';
 
 import { head, Transcript } from './transcript.js';
 import { fork, inPlace, messageCount, type Options, type Result } from './rewrite.js';
@@ -194,10 +194,14 @@ const headBytes = 1_000_000;
 function startingContextFor(transcript: Transcript): number {
   const own = startingContext(transcript.entries);
   if (own > 0) return own;
+  return startingContextNear(transcript.directory, transcript.path);
+}
 
+/** The newest session beside this one that can answer the question. */
+function startingContextNear(dir: string, exclude: string): number {
   const neighbours = store
-    .sessionFilesIn(transcript.directory)
-    .filter((path) => path !== transcript.path)
+    .sessionFilesIn(dir)
+    .filter((path) => path !== exclude)
     .sort((a, b) => store.modified(b) - store.modified(a))
     .slice(0, neighboursToRead);
 
@@ -414,6 +418,13 @@ function ladderLine(steps: Step[]): string {
   return steps.map((step) => `${step.n}: ${tokens(step.tokens)}`).join('   ');
 }
 
+/** Past this, the starting context is large enough that it is costing the
+ * person real room in every session they open. */
+const bloatedStartingContext = 25_000;
+
+/** How many of the newest sessions get a line of their own. */
+const recentSessions = 3;
+
 async function runMeasure(args: Args): Promise<void> {
   const paths = store.allSessionFiles();
   if (paths.length === 0) fail(`no sessions found under ${store.root()}`);
@@ -434,6 +445,28 @@ async function runMeasure(args: Args): Promise<void> {
   const dialogueShare = m.context === 0 ? 0 : m.dialogue / m.context;
   const startingShare = m.context === 0 ? 0 : m.starting / m.context;
   const heavyMedian = heavyMedianShare(m);
+  // A session with no short request of its own reads nothing, and showing that
+  // as a zero would count the starting context as removed. These few are worth
+  // asking a neighbour about.
+  const recent = [...m.sizes]
+    .sort((a, b) => store.modified(b.path) - store.modified(a.path))
+    .slice(0, recentSessions)
+    .map((size) => {
+      const room = Math.max(0, size.context - size.dialogue);
+      const starting =
+        size.starting > 0
+          ? size.starting
+          : Math.min(startingContextNear(dirname(size.path), size.path), room);
+      const id = basename(size.path).replace(/\.jsonl$/, '');
+      return {
+        id,
+        name: store.titleOf(id, dirname(size.path)) || id.slice(0, 8),
+        context: size.context,
+        starting,
+        kept: size.dialogue,
+        removed: Math.max(0, room - starting),
+      };
+    });
 
   if (has(args, 'json')) {
     print({
@@ -447,6 +480,14 @@ async function runMeasure(args: Args): Promise<void> {
         pooled: Math.round(pooled * 1000) / 10,
         median: Math.round(median * 1000) / 10,
       },
+      recent: recent.map((row) => ({
+        session: row.id,
+        title: row.name,
+        contextTokens: row.context,
+        removedTokens: row.removed,
+        startingContextTokens: row.starting,
+        keptTokens: row.kept,
+      })),
       filledUp: {
         overTokens: heavyContext,
         sessions: m.heavyShares.length,
@@ -485,6 +526,37 @@ async function runMeasure(args: Args): Promise<void> {
   say('  removed is tool calls and their results.');
   say('  starting context is your MCP tools, skills, CLAUDE.md files and so on.');
   say('  kept verbatim is every message you and Claude sent.');
+  if (recent.length > 0) {
+    say('');
+    say(
+      '  ' +
+        'your last 3 sessions'.padEnd(30) +
+        'context'.padStart(9) +
+        'removed'.padStart(9) +
+        'starting'.padStart(9) +
+        'kept'.padStart(9) +
+        'drops by'.padStart(10),
+    );
+    for (const row of recent) {
+      say(
+        '  ' +
+          oneLine(row.name, 29).padEnd(30) +
+          tokens(row.context).padStart(9) +
+          tokens(row.removed).padStart(9) +
+          tokens(row.starting).padStart(9) +
+          tokens(row.kept).padStart(9) +
+          percent(row.context === 0 ? 0 : row.removed / row.context).padStart(10),
+      );
+    }
+    const newest = recent[0];
+    if (newest !== undefined && newest.starting > bloatedStartingContext) {
+      say('');
+      say(
+        `  These start with ${tokens(newest.starting)} already loaded. ` +
+          '(You should fix this btw)',
+      );
+    }
+  }
   say('');
   say(
     `  ${m.heavyShares.length} of your sessions passed ${tokens(heavyContext)} tokens. ` +

@@ -52,6 +52,8 @@ export interface Measurement {
   context: number;
   dialogue: number;
   starting: number;
+  /** Every session that reported a size, so a caller can pick out its own. */
+  sizes: SessionSize[];
   /** Per session, the share of its own context that could be given back. */
   shares: number[];
   /** The same, for the sessions that actually filled up. */
@@ -93,6 +95,7 @@ export async function measure(
     context: 0,
     dialogue: 0,
     starting: 0,
+    sizes: [],
     shares: [],
     heavyShares: [],
   };
@@ -122,6 +125,7 @@ export async function measure(
       m.context += size.context;
       m.dialogue += size.dialogue;
       m.starting += size.starting;
+      m.sizes.push(size);
       const share = reclaimable(size) / size.context;
       m.shares.push(share);
       if (size.context >= heavyContext) m.heavyShares.push(share);
