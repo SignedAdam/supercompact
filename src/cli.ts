@@ -3,9 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
-import { Transcript } from './transcript.js';
+import { head, Transcript } from './transcript.js';
 import { fork, inPlace, messageCount, type Options, type Result } from './rewrite.js';
-import { stampUsage, tokensInJsonl } from './estimate.js';
+import { stampUsage, startingContext, tokensInJsonl } from './estimate.js';
 import { after, buildPreview, type Step } from './preview.js';
 import {
   measure,
@@ -176,6 +176,41 @@ function heldNote(result: Result): string {
   return parts.length === 0 ? '' : ', ' + parts.join(', ');
 }
 
+/** How many neighbouring sessions to look at before giving up. */
+const neighboursToRead = 6;
+
+/** How much of a neighbouring file the opening request is found in. */
+const headBytes = 1_000_000;
+
+/** The starting context for a session, read from the session itself where that
+ * is possible and from its most recent neighbour where it is not.
+ *
+ * A long session that was resumed carries no short request to read from. The
+ * figure also moves with the CLAUDE.md stack rather than being fixed, so a
+ * neighbour in the same project is the closest thing to hand. The newest one
+ * rather than the middle one, because the harness config drifts and the most
+ * recent reading is nearest to what the next session will pay. */
+function startingContextFor(transcript: Transcript): number {
+  const own = startingContext(transcript.entries);
+  if (own > 0) return own;
+
+  const neighbours = store
+    .sessionFilesIn(transcript.directory)
+    .filter((path) => path !== transcript.path)
+    .sort((a, b) => store.modified(b) - store.modified(a))
+    .slice(0, neighboursToRead);
+
+  for (const path of neighbours) {
+    try {
+      const reading = startingContext(head(path, headBytes));
+      if (reading > 0) return reading;
+    } catch {
+      // a neighbour that will not open is not a reason to stop
+    }
+  }
+  return 0;
+}
+
 // ── commands ────────────────────────────────────────────────────────────────
 
 function runCopy(args: Args): void {
@@ -183,7 +218,9 @@ function runCopy(args: Args): void {
   const result = fork(transcript, options(args));
   if (result.jsonl === '') fail(`${transcript.id.slice(0, 8)} has no dialogue to keep`);
 
-  const count = tokensInJsonl(result.jsonl);
+  // Claude Code reads this back when the session opens. The transcript alone is
+  // not what it will weigh, because the starting context is paid again.
+  const count = tokensInJsonl(result.jsonl) + startingContextFor(transcript);
   const title = nextTitle(currentTitle(transcript));
   const path = store.write({
     jsonl: stampUsage(result.jsonl, count),
@@ -250,7 +287,9 @@ function runInPlace(args: Args): void {
   const result = inPlace(transcript, options(args));
   if (result.jsonl === '') fail(`${transcript.id.slice(0, 8)} has no dialogue to keep`);
 
-  const count = tokensInJsonl(result.jsonl);
+  // Claude Code reads this back when the session opens. The transcript alone is
+  // not what it will weigh, because the starting context is paid again.
+  const count = tokensInJsonl(result.jsonl) + startingContextFor(transcript);
   try {
     store.replace(transcript.path, stampUsage(result.jsonl, count));
   } catch (error) {
@@ -302,15 +341,21 @@ function runPreview(args: Args): void {
   const { transcript } = open(args);
   const opts = options(args);
   const preview = buildPreview(transcript);
-  const total = after(preview, opts.toolLines, opts.keep);
+  const starting = startingContextFor(transcript);
+  // The before side is what the API charged, and that carries the starting
+  // context. Leaving it off the after side would report the gap between the two
+  // as a saving.
+  const kept = after(preview, opts.toolLines, opts.keep);
+  const total = kept + starting;
   const saved = Math.max(0, preview.now - total);
   const share = preview.now > 0 ? (saved / preview.now) * 100 : 0;
-  const held = total - preview.dialogue - (opts.toolLines ? preview.toolLines : 0);
+  const held = kept - preview.dialogue - (opts.toolLines ? preview.toolLines : 0);
 
   if (has(args, 'json')) {
     print({
       sessionId: transcript.id,
       tokensAreEstimate: true,
+      startingContext: starting,
       now: {
         tokens: preview.now,
         reported: preview.nowReported,
@@ -318,7 +363,7 @@ function runPreview(args: Args): void {
         messages: preview.messages,
         toolCalls: preview.calls,
       },
-      after: { tokens: total, heldBack: held },
+      after: { tokens: total, transcript: kept, heldBack: held },
       saved: { tokens: saved, percent: Math.round(share * 10) / 10 },
       asked: {
         tools: opts.toolLines,
@@ -347,6 +392,12 @@ function runPreview(args: Args): void {
       (held > 0 ? `, ${tokens(held)} of it held back on purpose` : ''),
   );
   say(`  saved  about ${tokens(saved)} tokens, ${Math.round(share)} percent`);
+  if (starting > 0) {
+    say(
+      `  ${tokens(starting)} of the after figure is the starting context, ` +
+        'which no rewrite removes.',
+    );
+  }
   say('');
   say('  what each option costs:');
   say(`    dialogue only      ${tokens(preview.dialogue)}`);

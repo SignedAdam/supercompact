@@ -44,7 +44,10 @@ export function allSessionFiles(): string[] {
 }
 
 export function sessionFilesFor(cwd: string): string[] {
-  const dir = directoryFor(cwd);
+  return sessionFilesIn(directoryFor(cwd));
+}
+
+export function sessionFilesIn(dir: string): string[] {
   try {
     return readdirSync(dir)
       .filter((file) => file.endsWith('.jsonl'))

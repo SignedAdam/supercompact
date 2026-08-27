@@ -194,6 +194,60 @@ $BIN 070e7a0c --in-place > /dev/null
 grep -q '(SC2)' "$SESSIONS/sessions-index.json"
 check "compacting twice counts the generations" $?
 
+# --- the starting context ---
+# The fixture's first request is 90,000 tokens with one short prompt in front
+# of it, so the figure the tool works out has a known answer.
+setup
+OUT=$($BIN 070e7a0c --preview --json 2>&1)
+echo "$OUT" | grep -q '"startingContext"'
+check "preview reports the starting context" $?
+
+python3 - "$OUT" <<'PYX'
+import json, sys
+d = json.loads(sys.argv[1])
+s = d["startingContext"]
+sys.exit(0 if 85_000 <= s <= 90_000 else f"startingContext was {s}")
+PYX
+check "it reads the figure from the first request" $?
+
+python3 - "$OUT" <<'PYX'
+import json, sys
+d = json.loads(sys.argv[1])
+want = d["after"]["transcript"] + d["startingContext"]
+sys.exit(0 if d["after"]["tokens"] == want else "the projection left the starting context out")
+PYX
+check "the projection carries the starting context" $?
+
+setup
+$BIN 070e7a0c > /dev/null
+python3 - "$(copy_of)" <<'PYX'
+import json, sys
+last = None
+for line in open(sys.argv[1]):
+    if not line.strip(): continue
+    usage = (json.loads(line).get("message") or {}).get("usage")
+    if usage: last = usage
+sys.exit(0 if last and last.get("input_tokens", 0) >= 85_000 else f"stamped {last}")
+PYX
+check "the copy is stamped with the size a reader will see" $?
+
+# A session with no request of its own takes the figure from the newest session
+# beside it, which is what a long resumed session has to do.
+setup
+BARE=aaaaaaaa-1111-2222-3333-444455556666
+cat > "$SESSIONS/$BARE.jsonl" <<EOF
+{"type":"user","uuid":"b1","parentUuid":null,"sessionId":"$BARE","cwd":"$PROJ","timestamp":"2026-08-05T00:00:00.000Z","message":{"role":"user","content":"Hello"}}
+{"type":"assistant","uuid":"b2","parentUuid":"b1","sessionId":"$BARE","cwd":"$PROJ","message":{"id":"m1","role":"assistant","content":[{"type":"text","text":"Hi"}]}}
+EOF
+OUT=$($BIN aaaaaaaa --preview --json 2>&1)
+python3 - "$OUT" <<'PYX'
+import json, sys
+d = json.loads(sys.argv[1])
+s = d["startingContext"]
+sys.exit(0 if 85_000 <= s <= 90_000 else f"neighbour reading was {s}")
+PYX
+check "a session with nothing to read borrows from its neighbour" $?
+
 # --- failure paths ---
 OUT=$($BIN zzzzzzzz 2>&1)
 echo "$OUT" | grep -q 'no session matching'
