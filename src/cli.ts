@@ -530,26 +530,29 @@ async function runMeasure(args: Args): Promise<void> {
     say('');
     say('  your last 3 sessions');
     say('');
+    // The full id sits in the row, because the next thing someone does with it
+    // is paste it into a command. That leaves the numbers a narrow column each.
     say(
       '  ' +
-        'current context'.padStart(17) +
-        'after supercompaction'.padStart(23) +
-        'starting context'.padStart(18) +
-        'removed'.padStart(10),
+        'session'.padEnd(38) +
+        'now'.padStart(8) +
+        'after'.padStart(10) +
+        'starting'.padStart(10) +
+        'removed'.padStart(9),
     );
     for (const row of recent) {
       const share = row.context === 0 ? 0 : row.removed / row.context;
-      // The full id, because the next thing someone does with it is paste it
-      // into a command.
-      say(`  ${row.id}`);
       say(
         '  ' +
-          tokens(row.context).padStart(17) +
-          tokens(row.starting + row.kept).padStart(23) +
-          tokens(row.starting).padStart(18) +
-          percent(share).padStart(10),
+          row.id.padEnd(38) +
+          tokens(row.context).padStart(8) +
+          tokens(row.starting + row.kept).padStart(10) +
+          tokens(row.starting).padStart(10) +
+          percent(share).padStart(9),
       );
     }
+    say('');
+    say('  after is what the session weighs once it has been supercompacted.');
     const newest = recent[0];
     if (newest !== undefined && newest.starting > bloatedStartingContext) {
       say('');

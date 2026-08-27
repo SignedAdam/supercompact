@@ -14,11 +14,11 @@ It reads every session in `~/.claude/projects` and writes nothing. Here is what
 it prints on my own machine:
 
 ```
-  3264 sessions, 363.9M tokens of context
+  3266 sessions, 364.0M tokens of context
 
-  removed                   228.8M    63%  ████████████████··········
-  starting context          111.4M    31%  ████████··················
-  kept verbatim              23.6M     6%  ██························
+  removed                   228.9M    63%  ████████████████··········
+  starting context          111.5M    31%  ████████··················
+  kept verbatim              23.7M     6%  ██························
 
   removed is tool calls and their results.
   starting context is your MCP tools, skills, CLAUDE.md files and so on.
@@ -26,15 +26,14 @@ it prints on my own machine:
 
   your last 3 sessions
 
-    current context  after supercompaction  starting context   removed
-  47fba1c4-36ff-4282-a992-473ede0c8660
-               747k                   316k               50k       58%
-  a4abe3a1-d4e9-4c99-823d-2d7d947564ce
-               249k                    86k               58k       65%
-  0f729543-99e5-4e56-8d31-ef3bcd0a2b47
-               563k                   179k               51k       68%
+  session                                    now     after  starting  removed
+  a4abe3a1-d4e9-4c99-823d-2d7d947564ce      255k       86k       58k      66%
+  fda42bf1-66b1-496b-9913-cc0173ececa1       37k       37k       35k       0%
+  47fba1c4-36ff-4282-a992-473ede0c8660      755k      316k       50k      58%
 
-  Your newest session starts with 50k already loaded. (You should fix this btw)
+  after is what the session weighs once it has been supercompacted.
+
+  Your newest session starts with 58k already loaded. (You should fix this btw)
 
   435 of your sessions passed 200k tokens. The middle one drops by 87%.
   Your heaviest session held 1.0M tokens. 3k of it was the two of you talking.
