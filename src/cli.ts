@@ -14,7 +14,6 @@ import {
   medianShare,
   pooledShare,
   reclaimableTotal,
-  recentCallsHeldBack,
   sessionsPast,
 } from './measure.js';
 import * as store from './store.js';
@@ -433,7 +432,6 @@ async function runMeasure(args: Args): Promise<void> {
   const pooled = pooledShare(m);
   const median = medianShare(m);
   const dialogueShare = m.context === 0 ? 0 : m.dialogue / m.context;
-  const heldShare = m.context === 0 ? 0 : m.heldBack / m.context;
   const startingShare = m.context === 0 ? 0 : m.starting / m.context;
   const heavyMedian = heavyMedianShare(m);
 
@@ -444,7 +442,6 @@ async function runMeasure(args: Args): Promise<void> {
       contextTokens: m.context,
       dialogueTokens: m.dialogue,
       reclaimableTokens: reclaim,
-      heldBackTokens: m.heldBack,
       startingContextTokens: m.starting,
       reclaimable: {
         pooled: Math.round(pooled * 1000) / 10,
@@ -457,7 +454,6 @@ async function runMeasure(args: Args): Promise<void> {
       },
       sessionsPast90: sessionsPast(m, 0.9),
       sessionsPast95: sessionsPast(m, 0.95),
-      heldBackIs: `images and the newest ${recentCallsHeldBack} tool results per session`,
       heaviest:
         m.heaviest === undefined
           ? null
@@ -474,7 +470,7 @@ async function runMeasure(args: Args): Promise<void> {
   say(`  ${m.sessions} sessions, ${tokens(m.context)} tokens of context`);
   say('');
   say(
-    `  tool calls and results  ${tokens(reclaim).padStart(8)}  ${percent(pooled)}  ` +
+    `  removed                 ${tokens(reclaim).padStart(8)}  ${percent(pooled)}  ` +
       bar(pooled, 26),
   );
   say(
@@ -482,21 +478,17 @@ async function runMeasure(args: Args): Promise<void> {
       bar(startingShare, 26),
   );
   say(
-    `  your conversation       ${tokens(m.dialogue).padStart(8)}  ${percent(dialogueShare)}  ` +
+    `  kept verbatim           ${tokens(m.dialogue).padStart(8)}  ${percent(dialogueShare)}  ` +
       bar(dialogueShare, 26),
   );
-  say(
-    `  left alone              ${tokens(m.heldBack).padStart(8)}  ${percent(heldShare)}  ` +
-      bar(heldShare, 26),
-  );
   say('');
-  say('  Supercompaction gives back the first row and keeps the third.');
-  say('  The starting context is the system prompt, the tool schemas, your');
-  say('  CLAUDE.md files and the skill listing. Every session pays it again.');
+  say('  removed is tool calls and their results.');
+  say('  starting context is your MCP tools, skills, CLAUDE.md files and so on.');
+  say('  kept verbatim is every message you and Claude sent.');
   say('');
   say(
     `  ${m.heavyShares.length} of your sessions passed ${tokens(heavyContext)} tokens. ` +
-      `The middle one gives back ${percent(heavyMedian).trim()}.`,
+      `The middle one drops by ${percent(heavyMedian).trim()}.`,
   );
   if (m.heaviest !== undefined) {
     say(
@@ -505,11 +497,8 @@ async function runMeasure(args: Args): Promise<void> {
     );
   }
   say('');
-  say(`  Context sizes are the numbers the API reported on each turn, not an estimate.`);
-  say(
-    `  Images and the newest ${recentCallsHeldBack} tool results are left out of the first row,`,
-  );
-  say('  so the figure is the floor rather than the best case.');
+  say('  Context sizes are the numbers the API reported on each turn, not an estimate.');
+  say('  The keep options hold some tool results back, and the preview prices them.');
   say('');
   say('  Try it on this machine:  npx supercompact --preview');
   say('');

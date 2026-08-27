@@ -7,20 +7,16 @@
 // words both sides actually said, and compare the two at the turn where the
 // context was largest.
 //
-// The figure this reports is deliberately the floor. Two things that could be
-// counted as recoverable are held back instead:
-//
-//   images         a screenshot may be the only reason a turn made sense
-//   recent calls   whatever was just read or run is state you are standing in
-//
-// Both are recoverable in practice, and the tool will drop them if asked. They
-// are excluded here so the number cannot be argued down.
+// What is removed here is what the tool removes with no options given: every
+// tool call, every tool result, and the images inside them. The keep options
+// hold some of that back, and a session rewritten with them is larger by
+// exactly the amount the preview prices.
 
 import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 
 import { assistantText, promptText } from './dialogue.js';
-import { charsPerToken, imageTokens, StartingContext, tokensInContent } from './estimate.js';
+import { charsPerToken, StartingContext } from './estimate.js';
 import { isRecord } from './transcript.js';
 
 /** A line this long is always tool output and never anything anyone said. */
@@ -33,9 +29,6 @@ export const minimumContext = 20_000;
 /** An example worth printing comes from a session someone worked in. */
 const exampleContext = 100_000;
 
-/** How many of the newest tool results are treated as state worth keeping. */
-export const recentCallsHeldBack = 5;
-
 /** A session that never got big says little about a tool for sessions that did.
  * Below this, most of the context is the starting context, and no rewrite gives
  * that back. */
@@ -45,22 +38,19 @@ export interface SessionSize {
   path: string;
   context: number;
   dialogue: number;
-  /** Images and the newest few tool results, left out of the reclaimable side. */
-  heldBack: number;
   /** The system prompt, the tool schemas and the CLAUDE.md files. Paid again by
    * every session, so no rewrite gives it back. */
   starting: number;
 }
 
 export function reclaimable(size: SessionSize): number {
-  return Math.max(0, size.context - size.dialogue - size.heldBack - size.starting);
+  return Math.max(0, size.context - size.dialogue - size.starting);
 }
 
 export interface Measurement {
   sessions: number;
   context: number;
   dialogue: number;
-  heldBack: number;
   starting: number;
   /** Per session, the share of its own context that could be given back. */
   shares: number[];
@@ -70,7 +60,7 @@ export interface Measurement {
 }
 
 export function reclaimableTotal(m: Measurement): number {
-  return Math.max(0, m.context - m.dialogue - m.heldBack - m.starting);
+  return Math.max(0, m.context - m.dialogue - m.starting);
 }
 
 export function pooledShare(m: Measurement): number {
@@ -102,7 +92,6 @@ export async function measure(
     sessions: 0,
     context: 0,
     dialogue: 0,
-    heldBack: 0,
     starting: 0,
     shares: [],
     heavyShares: [],
@@ -132,7 +121,6 @@ export async function measure(
       m.sessions++;
       m.context += size.context;
       m.dialogue += size.dialogue;
-      m.heldBack += size.heldBack;
       m.starting += size.starting;
       const share = reclaimable(size) / size.context;
       m.shares.push(share);
@@ -154,12 +142,11 @@ export async function measure(
 }
 
 /** The turn where a session's context was largest, how much of it had been said
- * out loud by then, and how much of the remainder is being left alone. */
+ * out loud by then, and how much of it the session was carrying before either
+ * of them had said anything. */
 export async function measureOne(path: string): Promise<SessionSize | undefined> {
   let spoken = 0;
-  let images = 0;
   const starting = new StartingContext();
-  const recent: number[] = [];
   let best: { context: number; dialogue: number } | undefined;
 
   const lines = createInterface({
@@ -172,12 +159,7 @@ export async function measureOne(path: string): Promise<SessionSize | undefined>
     // costs more than the rest of the file put together, so it is priced from
     // the outside instead.
     if (line.length > skipLinesOver) {
-      const shots = countImages(line);
-      if (shots > 0) images += shots * imageTokens(sizeOfImage(line));
-      const priced = Math.round(line.length / charsPerToken);
-      recent.push(priced);
-      if (recent.length > recentCallsHeldBack) recent.shift();
-      starting.carriedTokens(priced);
+      starting.carriedTokens(Math.round(line.length / charsPerToken));
       continue;
     }
 
@@ -195,8 +177,6 @@ export async function measureOne(path: string): Promise<SessionSize | undefined>
       if (!isRecord(record)) continue;
       const message = record.message;
       if (!isRecord(message)) continue;
-      recent.push(tokensInContent(message.content));
-      if (recent.length > recentCallsHeldBack) recent.shift();
       starting.carried(message.content);
       continue;
     }
@@ -246,27 +226,13 @@ export async function measureOne(path: string): Promise<SessionSize | undefined>
 
   if (best === undefined || best.context < minimumContext) return undefined;
 
-  const held = images + recent.reduce((total, tokens) => total + tokens, 0);
   const room = Math.max(0, best.context - best.dialogue);
-  const heldBack = Math.min(held, room);
   return {
     path,
     context: best.context,
     dialogue: best.dialogue,
-    heldBack,
-    starting: Math.min(starting.value, room - heldBack),
+    starting: Math.min(starting.value, room),
   };
-}
-
-function countImages(line: string): number {
-  const matches = line.match(/"type":"image"/g);
-  return matches === null ? 0 : matches.length;
-}
-
-function sizeOfImage(line: string): [number, number] | undefined {
-  const match = /\((\d{2,5})x(\d{2,5})/.exec(line.slice(0, 4000));
-  if (match === null) return undefined;
-  return [Number(match[1]), Number(match[2])];
 }
 
 function count(value: unknown): number {

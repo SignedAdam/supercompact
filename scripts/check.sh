@@ -155,17 +155,17 @@ check "the full copy kept everything" $?
 # --- measure ---
 setup
 OUT=$($BIN measure 2>&1)
-echo "$OUT" | grep -q 'tool calls and results'
+echo "$OUT" | grep -q 'removed is tool calls and their results'
 check "measure reports a number" $?
 
-echo "$OUT" | grep -q 'the floor rather than the best case'
-check "measure says what it is leaving out" $?
+echo "$OUT" | grep -q 'starting context is your MCP tools'
+check "measure says what the starting context is" $?
 OUT=$($BIN measure --json 2>&1)
 echo "$OUT" | grep -q '"reclaimableTokens"'
 check "measure --json reports what could be given back" $?
 
-echo "$OUT" | grep -q '"heldBackIs"'
-check "measure --json names what it held back" $?
+echo "$OUT" | grep -q '"startingContextTokens"'
+check "measure --json separates the starting context" $?
 
 # --- typos do not pass quietly ---
 setup
