@@ -45,4 +45,19 @@ jobs:
             exit 1
           fi
 
-      - run: npm publish --access public
+      # Re-running a tag, or tagging a version that was published by hand, must
+      # not fail the run.
+      - name: Skip a version the registry already has
+        id: exists
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/supercompact/$pkg")
+          if [ "$code" = "200" ]; then
+            echo "supercompact@$pkg is already on the registry, nothing to do"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.exists.outputs.published == 'false'
+        run: npm publish --access public
