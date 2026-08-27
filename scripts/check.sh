@@ -61,6 +61,25 @@ SUM=$(shasum "$SESSIONS/$ID.jsonl" | awk '{print $1}')
 $BIN version | grep -qE '^supercompact [0-9]+\.[0-9]+\.[0-9]+$'
 check "version prints a version" $?
 
+[ "$($BIN version | awk '{print $2}')" = "$(node -p "require('./package.json').version")" ]
+check "the reported version matches package.json" $?
+
+[ "$($BIN -v | awk '{print $2}')" = "$(node -p "require('./package.json').version")" ]
+check "-v prints the version too" $?
+
+# The headline promise. A prompt nobody wrapped in a noise tag must come back
+# identical, blank line runs and trailing newline included.
+node -e "
+import('./dist/dialogue.js').then((m) => {
+  const kept = 'Here is the function:\n\n\n    def f():\n        return 1\n\n\nReview it.\n';
+  if (m.stripNoise(kept) !== kept) process.exit(1);
+  const noisy = 'do it<system-reminder>ignore me</system-reminder>';
+  if (m.stripNoise(noisy) !== 'do it') process.exit(1);
+  process.exit(0);
+});
+"
+check "a prompt with no noise survives byte for byte" $?
+
 OUT=$($BIN help 2>&1)
 echo "$OUT" | grep -q 'keep the conversation'
 check "help says what it does" $?

@@ -39,8 +39,15 @@ export function assistantText(content: unknown): string {
 const noise =
   /<(system-reminder|local-command-caveat|command-stdout|command-stderr)\b[^>]*>[\s\S]*?<\/\1>/g;
 
+/** Removing a noise tag leaves a hole, and the blank lines around it collapse
+ * so the prompt reads the way it was written. A prompt with no noise in it is
+ * returned untouched: the promise is that a message nobody wrapped in a tag
+ * survives byte for byte, and normalising it anyway would break that for
+ * anyone who pasted code with a run of blank lines. */
 export function stripNoise(text: string): string {
-  return text.replace(noise, '').replace(/\n{3,}/g, '\n\n').trim();
+  const stripped = text.replace(noise, '');
+  if (stripped === text) return text;
+  return stripped.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 const maxValueChars = 120;

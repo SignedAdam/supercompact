@@ -8,6 +8,13 @@ import { basename, dirname } from 'node:path';
 export type Record_ = { [key: string]: unknown };
 export type Block = { [key: string]: unknown };
 
+/** Claude Code turns a working directory into a folder name by replacing both
+ * slashes and dots with dashes, so /Users/a/.config lands at -Users-a--config.
+ * Both the store and the cwd lookup depend on this, so it lives in one place. */
+export function folderFor(cwd: string): string {
+  return cwd.replace(/\//g, '-').replace(/\./g, '-');
+}
+
 /** One line, kept as both raw text and parsed form.
  *
  * The raw text matters. A line that is copied rather than rewritten has to go
@@ -79,13 +86,23 @@ export class Transcript {
   }
 
   /** The working directory the session was recorded in. `claude --resume` only
-   * finds a session when it runs from there. */
+   * finds a session when it runs from there.
+   *
+   * The first record is the wrong place to read this from. A session started in
+   * a git worktree carries the parent repository as its opening cwd, so trusting
+   * the first record files the copy under the wrong project and prints a resume
+   * line that cannot work. The directory the file already sits in is the answer
+   * Claude Code itself uses, so prefer whichever recorded cwd maps onto it. */
   get cwd(): string {
+    const folder = basename(this.directory);
+    let first = '';
     for (const entry of this.entries) {
       const cwd = entry.data.cwd;
-      if (typeof cwd === 'string' && cwd !== '') return cwd;
+      if (typeof cwd !== 'string' || cwd === '') continue;
+      if (folderFor(cwd) === folder) return cwd;
+      if (first === '') first = cwd;
     }
-    return '';
+    return first;
   }
 
   get gitBranch(): string {

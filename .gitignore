@@ -4,3 +4,6 @@ dist/
 # Launch night, this machine only. Both hardcode local paths.
 scripts/publish.sh
 scripts/after-publish.sh
+
+*.tgz
+.DS_Store

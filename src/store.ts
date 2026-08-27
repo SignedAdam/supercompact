@@ -5,20 +5,24 @@ import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-import { Transcript, decode, encode, isRecord, type Record_ } from './transcript.js';
+import { Transcript, decode, encode, folderFor, isRecord, type Record_ } from './transcript.js';
 
 /** SUPERCOMPACT_ROOT points every read and write somewhere else, which is how
- * the checks run without going near real sessions. */
+ * the checks run without going near real sessions.
+ *
+ * CLAUDE_CONFIG_DIR is Claude Code's own variable for moving the whole tree,
+ * which is how people keep a work account and a personal one apart. Ignoring it
+ * means telling someone with thousands of sessions that they have none. */
 export function root(): string {
   const override = process.env.SUPERCOMPACT_ROOT;
   if (override !== undefined && override !== '') return override;
+  const config = process.env.CLAUDE_CONFIG_DIR;
+  if (config !== undefined && config !== '') return join(config, 'projects');
   return join(homedir(), '.claude', 'projects');
 }
 
-/** Claude Code turns a working directory into a folder name by replacing both
- * slashes and dots with dashes, so /Users/a/.config lands at -Users-a--config. */
 export function directoryFor(cwd: string): string {
-  return join(root(), cwd.replace(/\//g, '-').replace(/\./g, '-'));
+  return join(root(), folderFor(cwd));
 }
 
 export function allSessionFiles(): string[] {

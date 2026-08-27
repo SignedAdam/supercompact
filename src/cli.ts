@@ -18,7 +18,7 @@ import {
 } from './measure.js';
 import * as store from './store.js';
 
-const version = '1.0.0';
+const version = '1.0.1';
 
 // Every option the tool accepts. Anything else is a typo, and a typo that is
 // ignored without a word is worse than one that stops: --keep-tool 5 would
@@ -671,13 +671,23 @@ AFTER IT RUNS
 `;
 
 async function main(): Promise<void> {
+  // `supercompact measure | head` closes the pipe early. Node's default is an
+  // unhandled EPIPE and a stack trace, which reads as a crash when the command
+  // did exactly what was asked.
+  process.stdout.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EPIPE') process.exit(0);
+    throw error;
+  });
+
   const argv = process.argv.slice(2);
   const first = argv[0];
 
   if (first === 'measure') return runMeasure(parse(argv.slice(1)));
   if (first === 'list') return runList(parse(argv.slice(1)));
   if (first === 'help' || first === '--help' || first === '-h') return say(help.trimEnd());
-  if (first === 'version' || first === '--version') return say(`supercompact ${version}`);
+  if (first === 'version' || first === '--version' || first === '-v') {
+    return say(`supercompact ${version}`);
+  }
 
   const args = parse(argv);
   if (has(args, 'preview')) return runPreview(args);

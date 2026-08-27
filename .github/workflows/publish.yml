@@ -31,7 +31,7 @@ jobs:
 
       # setup-node pins npm 10, which has no OIDC support. Trusted publishing
       # needs 11.5.1 or newer.
-      - run: npm install -g npm@latest
+      - run: npm install -g npm@^11.5.1
 
       - run: npm install
       - run: npm run check

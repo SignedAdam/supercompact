@@ -1,6 +1,6 @@
 {
   "name": "supercompact",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Cut up to 95% of tokens from Claude Code sessions without losing conversation history",
   "keywords": [
     "claude-code",
@@ -16,12 +16,22 @@
   ],
   "license": "MIT",
   "author": "Adam Albastov",
-  "repository": { "type": "git", "url": "git+https://github.com/SignedAdam/supercompact.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SignedAdam/supercompact.git"
+  },
   "homepage": "https://github.com/SignedAdam/supercompact",
   "type": "module",
-  "bin": { "supercompact": "dist/cli.js" },
-  "files": ["dist"],
-  "engines": { "node": ">=18" },
+  "bin": {
+    "supercompact": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "agent"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",

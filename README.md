@@ -3,11 +3,11 @@
 </p>
 
 <p align="center">
-<a href="https://www.npmjs.com/package/supercompact"><img src="https://img.shields.io/npm/v/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=NPM" alt="npm version"></a>
-<a href="https://github.com/SignedAdam/supercompact/actions/workflows/check.yml"><img src="https://img.shields.io/github/actions/workflow/status/SignedAdam/supercompact/check.yml?branch=main&style=for-the-badge&color=C8FF00&labelColor=000000&label=48%20CHECKS" alt="checks"></a>
-<a href="https://nodejs.org"><img src="https://img.shields.io/node/v/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=NODE" alt="node"></a>
+<a href="https://www.npmjs.com/package/supercompact"><img src="https://img.shields.io/npm/v/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=NPM&cacheSeconds=300" alt="npm version"></a>
+<a href="https://github.com/SignedAdam/supercompact/actions/workflows/check.yml"><img src="https://img.shields.io/github/actions/workflow/status/SignedAdam/supercompact/check.yml?branch=main&style=for-the-badge&color=C8FF00&labelColor=000000&label=CHECKS&cacheSeconds=300" alt="checks"></a>
+<a href="https://nodejs.org"><img src="https://img.shields.io/badge/NODE-%3E%3D18-C8FF00?style=for-the-badge&labelColor=000000" alt="node 18 and up"></a>
 <a href="package.json"><img src="https://img.shields.io/badge/RUNTIME%20DEPS-0-C8FF00?style=for-the-badge&labelColor=000000" alt="zero runtime dependencies"></a>
-<a href="LICENSE"><img src="https://img.shields.io/npm/l/supercompact?style=for-the-badge&color=C8FF00&labelColor=000000&label=LICENSE" alt="MIT license"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/LICENSE-MIT-C8FF00?style=for-the-badge&labelColor=000000" alt="MIT license"></a>
 </p>
 
 Up to 95% of the tokens in a heavy Claude Code session are tool traffic. `supercompact` strips that traffic out of the transcript on disk and gives you back the context window.
@@ -85,7 +85,7 @@ kept 724 messages from you and 774 from Claude
   now  1.3 MB, about 180k tokens
 
   new session  1f4df052-7cea-4af3-97fc-e990d7dd707c
-  resume it    cd '/Users/sauel/dev/agents' && claude --resume 1f4df052-7cea-4af3-97fc-e990d7dd707c
+  resume it    cd '/Users/you/dev/agents' && claude --resume 1f4df052-7cea-4af3-97fc-e990d7dd707c
 
   0f729543 was not touched.
 ```
@@ -143,9 +143,20 @@ supercompact version         print the version
 
 ## Inside Claude Code
 
-The repo includes a slash command and an agent skill under `agent/`. To install them:
+`supercompact` includes a slash command and an agent skill under `agent/`.
+
+If you installed globally:
 
 ```bash
+mkdir -p ~/.claude/commands ~/.claude/skills
+cp $(npm root -g)/supercompact/agent/commands/supercompact.md ~/.claude/commands/
+cp -r $(npm root -g)/supercompact/agent/skills/supercompact ~/.claude/skills/
+```
+
+Or from a cloned repo:
+
+```bash
+mkdir -p ~/.claude/commands ~/.claude/skills
 cp agent/commands/supercompact.md ~/.claude/commands/
 cp -r agent/skills/supercompact ~/.claude/skills/
 ```
@@ -167,6 +178,6 @@ The skill lets Claude Code measure its own transcript and strip tool traffic aut
 
 - Node.js 18 or higher. Tested on Node 18 and 22 in CI.
 - Zero runtime dependencies.
-- 48 tests run against throwaway session trees in CI on macOS and Ubuntu.
+- 51 tests run against throwaway session trees in CI on macOS and Ubuntu.
 - Windows is untested.
 - MIT license. Author Adam Albastov. Source code on [GitHub](https://github.com/SignedAdam/supercompact).
