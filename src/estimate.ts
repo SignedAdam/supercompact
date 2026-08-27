@@ -124,8 +124,9 @@ export function tokensAsCharged(content: unknown): number {
  * Returns 0 when the session has no request worth reading. That is the honest
  * answer, and every caller treats it as one. */
 export function startingContext(entries: Entry[]): number {
-  let inFront = 0;
+  const reader = new StartingContext();
   for (const entry of entries) {
+    if (!reader.looking) break;
     if (entry.type !== 'user' && entry.type !== 'assistant') continue;
     const message = entry.message;
     if (message === undefined) continue;
@@ -135,19 +136,55 @@ export function startingContext(entries: Entry[]): number {
     if (entry.type === 'assistant' && entry.data.usageIsEstimate !== true) {
       const usage = message.usage;
       if (isRecord(usage)) {
-        const reported =
+        reader.request(
           asNumber(usage.input_tokens) +
-          asNumber(usage.cache_read_input_tokens) +
-          asNumber(usage.cache_creation_input_tokens);
-        if (reported >= leastReportedRequest && inFront < mostTranscriptInFront) {
-          const starting = reported - inFront;
-          return starting > 0 && starting <= mostStartingContext ? starting : 0;
-        }
+            asNumber(usage.cache_read_input_tokens) +
+            asNumber(usage.cache_creation_input_tokens),
+        );
+        if (!reader.looking) break;
       }
     }
-    inFront += tokensAsCharged(message.content);
+    reader.carried(message.content);
   }
-  return 0;
+  return reader.value;
+}
+
+/** The rule above, worked out as a session is read rather than after.
+ *
+ * Two callers need it from different directions. The preview holds the whole
+ * session in memory. `measure` sees one line at a time and never holds two.
+ * Both feed this, so the rule itself exists once. */
+export class StartingContext {
+  private inFront = 0;
+  private found = 0;
+  private done = false;
+
+  /** Whether there is still any point in reading. */
+  get looking(): boolean {
+    return !this.done && this.inFront < mostTranscriptInFront;
+  }
+
+  get value(): number {
+    return this.found;
+  }
+
+  /** A request the API charged for, with everything so far in front of it. */
+  request(reported: number): void {
+    if (!this.looking || reported < leastReportedRequest) return;
+    this.done = true;
+    const starting = reported - this.inFront;
+    if (starting > 0 && starting <= mostStartingContext) this.found = starting;
+  }
+
+  /** A message the next request will carry. */
+  carried(content: unknown): void {
+    if (this.looking) this.inFront += tokensAsCharged(content);
+  }
+
+  /** The same, for a line too large to parse and priced from the outside. */
+  carriedTokens(tokens: number): void {
+    if (this.looking) this.inFront += tokens;
+  }
 }
 
 function asNumber(value: unknown): number {

@@ -20,7 +20,7 @@ import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 
 import { assistantText, promptText } from './dialogue.js';
-import { charsPerToken, imageTokens, tokensInContent } from './estimate.js';
+import { charsPerToken, imageTokens, StartingContext, tokensInContent } from './estimate.js';
 import { isRecord } from './transcript.js';
 
 /** A line this long is always tool output and never anything anyone said. */
@@ -36,16 +36,24 @@ const exampleContext = 100_000;
 /** How many of the newest tool results are treated as state worth keeping. */
 export const recentCallsHeldBack = 5;
 
+/** A session that never got big says little about a tool for sessions that did.
+ * Below this, most of the context is the starting context, and no rewrite gives
+ * that back. */
+export const heavyContext = 200_000;
+
 export interface SessionSize {
   path: string;
   context: number;
   dialogue: number;
   /** Images and the newest few tool results, left out of the reclaimable side. */
   heldBack: number;
+  /** The system prompt, the tool schemas and the CLAUDE.md files. Paid again by
+   * every session, so no rewrite gives it back. */
+  starting: number;
 }
 
 export function reclaimable(size: SessionSize): number {
-  return Math.max(0, size.context - size.dialogue - size.heldBack);
+  return Math.max(0, size.context - size.dialogue - size.heldBack - size.starting);
 }
 
 export interface Measurement {
@@ -53,13 +61,16 @@ export interface Measurement {
   context: number;
   dialogue: number;
   heldBack: number;
+  starting: number;
   /** Per session, the share of its own context that could be given back. */
   shares: number[];
+  /** The same, for the sessions that actually filled up. */
+  heavyShares: number[];
   heaviest?: SessionSize;
 }
 
 export function reclaimableTotal(m: Measurement): number {
-  return Math.max(0, m.context - m.dialogue - m.heldBack);
+  return Math.max(0, m.context - m.dialogue - m.heldBack - m.starting);
 }
 
 export function pooledShare(m: Measurement): number {
@@ -71,6 +82,13 @@ export function medianShare(m: Measurement): number {
   return m.shares[Math.floor(m.shares.length / 2)] ?? 0;
 }
 
+/** The middle session among those that filled up, which is the only group the
+ * tool is for. */
+export function heavyMedianShare(m: Measurement): number {
+  if (m.heavyShares.length === 0) return 0;
+  return m.heavyShares[Math.floor(m.heavyShares.length / 2)] ?? 0;
+}
+
 /** How many sessions could give back at least this share of their context. */
 export function sessionsPast(m: Measurement, share: number): number {
   return m.shares.filter((value) => value >= share).length;
@@ -80,7 +98,15 @@ export async function measure(
   paths: string[],
   onProgress?: (done: number) => void,
 ): Promise<Measurement> {
-  const m: Measurement = { sessions: 0, context: 0, dialogue: 0, heldBack: 0, shares: [] };
+  const m: Measurement = {
+    sessions: 0,
+    context: 0,
+    dialogue: 0,
+    heldBack: 0,
+    starting: 0,
+    shares: [],
+    heavyShares: [],
+  };
 
   // Reading is the slow part and the files are independent, so a handful are
   // in flight at once.
@@ -107,7 +133,10 @@ export async function measure(
       m.context += size.context;
       m.dialogue += size.dialogue;
       m.heldBack += size.heldBack;
-      m.shares.push(reclaimable(size) / size.context);
+      m.starting += size.starting;
+      const share = reclaimable(size) / size.context;
+      m.shares.push(share);
+      if (size.context >= heavyContext) m.heavyShares.push(share);
       if (
         size.context >= exampleContext &&
         size.dialogue > 0 &&
@@ -120,6 +149,7 @@ export async function measure(
 
   await Promise.all(Array.from({ length: Math.min(width, paths.length) }, worker));
   m.shares.sort((a, b) => a - b);
+  m.heavyShares.sort((a, b) => a - b);
   return m;
 }
 
@@ -128,6 +158,7 @@ export async function measure(
 export async function measureOne(path: string): Promise<SessionSize | undefined> {
   let spoken = 0;
   let images = 0;
+  const starting = new StartingContext();
   const recent: number[] = [];
   let best: { context: number; dialogue: number } | undefined;
 
@@ -143,8 +174,10 @@ export async function measureOne(path: string): Promise<SessionSize | undefined>
     if (line.length > skipLinesOver) {
       const shots = countImages(line);
       if (shots > 0) images += shots * imageTokens(sizeOfImage(line));
-      recent.push(Math.round(line.length / charsPerToken));
+      const priced = Math.round(line.length / charsPerToken);
+      recent.push(priced);
       if (recent.length > recentCallsHeldBack) recent.shift();
+      starting.carriedTokens(priced);
       continue;
     }
 
@@ -164,6 +197,7 @@ export async function measureOne(path: string): Promise<SessionSize | undefined>
       if (!isRecord(message)) continue;
       recent.push(tokensInContent(message.content));
       if (recent.length > recentCallsHeldBack) recent.shift();
+      starting.carried(message.content);
       continue;
     }
 
@@ -181,6 +215,7 @@ export async function measureOne(path: string): Promise<SessionSize | undefined>
     if (record.type === 'user') {
       const text = promptText(message.content);
       if (text !== undefined) spoken += text.length / charsPerToken;
+      starting.carried(message.content);
       continue;
     }
     if (record.type !== 'assistant') continue;
@@ -189,13 +224,21 @@ export async function measureOne(path: string): Promise<SessionSize | undefined>
 
     // A session this tool rewrote carries a stamped estimate. Reading that back
     // would be measuring our own arithmetic.
-    if (record.usageIsEstimate === true) continue;
+    if (record.usageIsEstimate === true) {
+      starting.carried(message.content);
+      continue;
+    }
     const usage = message.usage;
-    if (!isRecord(usage)) continue;
+    if (!isRecord(usage)) {
+      starting.carried(message.content);
+      continue;
+    }
     const context =
       count(usage.input_tokens) +
       count(usage.cache_read_input_tokens) +
       count(usage.cache_creation_input_tokens);
+    starting.request(context);
+    starting.carried(message.content);
     if (best === undefined || context > best.context) {
       best = { context, dialogue: Math.min(Math.trunc(spoken), context) };
     }
@@ -204,11 +247,14 @@ export async function measureOne(path: string): Promise<SessionSize | undefined>
   if (best === undefined || best.context < minimumContext) return undefined;
 
   const held = images + recent.reduce((total, tokens) => total + tokens, 0);
+  const room = Math.max(0, best.context - best.dialogue);
+  const heldBack = Math.min(held, room);
   return {
     path,
     context: best.context,
     dialogue: best.dialogue,
-    heldBack: Math.min(held, Math.max(0, best.context - best.dialogue)),
+    heldBack,
+    starting: Math.min(starting.value, room - heldBack),
   };
 }
 

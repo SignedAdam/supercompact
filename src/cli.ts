@@ -8,6 +8,8 @@ import { fork, inPlace, messageCount, type Options, type Result } from './rewrit
 import { stampUsage, startingContext, tokensInJsonl } from './estimate.js';
 import { after, buildPreview, type Step } from './preview.js';
 import {
+  heavyContext,
+  heavyMedianShare,
   measure,
   medianShare,
   pooledShare,
@@ -432,6 +434,8 @@ async function runMeasure(args: Args): Promise<void> {
   const median = medianShare(m);
   const dialogueShare = m.context === 0 ? 0 : m.dialogue / m.context;
   const heldShare = m.context === 0 ? 0 : m.heldBack / m.context;
+  const startingShare = m.context === 0 ? 0 : m.starting / m.context;
+  const heavyMedian = heavyMedianShare(m);
 
   if (has(args, 'json')) {
     print({
@@ -441,9 +445,15 @@ async function runMeasure(args: Args): Promise<void> {
       dialogueTokens: m.dialogue,
       reclaimableTokens: reclaim,
       heldBackTokens: m.heldBack,
+      startingContextTokens: m.starting,
       reclaimable: {
         pooled: Math.round(pooled * 1000) / 10,
         median: Math.round(median * 1000) / 10,
+      },
+      filledUp: {
+        overTokens: heavyContext,
+        sessions: m.heavyShares.length,
+        median: Math.round(heavyMedian * 1000) / 10,
       },
       sessionsPast90: sessionsPast(m, 0.9),
       sessionsPast95: sessionsPast(m, 0.95),
@@ -468,6 +478,10 @@ async function runMeasure(args: Args): Promise<void> {
       bar(pooled, 26),
   );
   say(
+    `  starting context        ${tokens(m.starting).padStart(8)}  ${percent(startingShare)}  ` +
+      bar(startingShare, 26),
+  );
+  say(
     `  your conversation       ${tokens(m.dialogue).padStart(8)}  ${percent(dialogueShare)}  ` +
       bar(dialogueShare, 26),
   );
@@ -476,10 +490,13 @@ async function runMeasure(args: Args): Promise<void> {
       bar(heldShare, 26),
   );
   say('');
-  say(`  Supercompaction gives back the first row and keeps the second.`);
+  say('  Supercompaction gives back the first row and keeps the third.');
+  say('  The starting context is the system prompt, the tool schemas, your');
+  say('  CLAUDE.md files and the skill listing. Every session pays it again.');
+  say('');
   say(
-    `  In the middle session that is ${percent(median).trim()} of the context, ` +
-      `and ${sessionsPast(m, 0.9)} of your ${m.sessions} sessions are past 90 percent.`,
+    `  ${m.heavyShares.length} of your sessions passed ${tokens(heavyContext)} tokens. ` +
+      `The middle one gives back ${percent(heavyMedian).trim()}.`,
   );
   if (m.heaviest !== undefined) {
     say(
