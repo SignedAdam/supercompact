@@ -632,47 +632,42 @@ function print(payload: unknown): void {
 
 // ── entry ───────────────────────────────────────────────────────────────────
 
-const help = `supercompact — keep the conversation, drop everything the machine fetched
+const help = `supercompact — keep the conversation, drop the tool traffic
 
 USAGE
-  npx supercompact measure             how much of your context is not conversation
-  supercompact [<session>] [options]   rewrite a session down to its dialogue
-  supercompact list [--limit N]        recent sessions
-  supercompact help
+  npx supercompact measure             report token split across all sessions
+  supercompact [<session>] [options]   strip tool traffic from a session
+  supercompact list [--limit N]        list recent sessions
+  supercompact help                    show this help
+  supercompact version                 print version
 
-  <session> is the first few characters of a session id, from \`list\`.
-  With no session it acts on the one running in this directory.
+  <session> is the start of a session id from \`list\`.
+  With no session passed, it targets the active one in this directory.
 
-WHAT IT KEEPS
-  Everything you typed and everything Claude said back, word for word.
-  Nothing is summarised.
-
-WHAT IT DROPS
-  Tool calls and their output: files read, commands run, pages fetched,
-  screenshots taken. That is where the room comes from.
+WHAT IT DOES
+  Every human message and assistant response stays character for character.
+  Tool calls, command outputs, file reads, and logs are deleted.
+  No language model is used.
 
 OPTIONS
-  --tools             One line per tool call saying what ran, never what
-                      it returned
-  --keep-last N       Leave the last N messages exactly as they are, tool
-                      output included
-  --keep-tools N      Give the newest N tool calls their full output
-  --unique-tools      A call that repeats counts once against --keep-tools
-  --preview           Print what it would cost. Writes nothing.
-  --in-place          Rewrite this session instead of copying it, keeping its
-                      id and its name. A full copy is written first.
-  --json              Machine-readable output
-  --project-dir PATH  Look for the running session in PATH instead of here
-  --limit N           How many sessions \`list\` shows (default 20)
+  --tools            keep one line per tool call and drop the output
+  --keep-last N      keep the newest N messages unchanged
+  --keep-tools N     keep the newest N tool results
+  --unique-tools     with --keep-tools, repeated identical calls count once
+  --preview          print the token savings without writing any files
+  --in-place         rewrite the session file instead of making a copy
+  --json             output machine-readable JSON
+  --limit N          number of sessions to display with list
+  --project-dir P    look in project directory P instead of current directory
 
 SAFETY
-  Copying is the default and never touches the original. --in-place writes a
-  full copy before it changes anything, and leaves the turn in progress alone
-  so a session that is still running can carry on.
+  Copying is the default behavior. The original transcript is never modified.
+  When --in-place is passed, a complete backup is written before any changes.
+  Trailing entries are preserved so an active turn continues working.
 
 AFTER IT RUNS
-  A live session never re-reads its own file, so nothing shrinks until you
-  resume it. The command prints how.
+  Claude Code reads session files on startup. A running session does not shrink
+  until you resume it. The command prints the exact resume line.
 `;
 
 async function main(): Promise<void> {

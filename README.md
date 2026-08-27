@@ -1,24 +1,19 @@
 # supercompact
 
-Reduce your Claude Code session context by 95%.
+`supercompact` removes tool calls and tool results from Claude Code sessions and leaves every conversation turn untouched.
 
-95% of your session is tool calls and tool results.
+Run this first. It reads your local sessions, calculates the token split across your history, and writes nothing:
 
-## Try it without installing
-
-```
+```bash
 npx supercompact measure
 ```
 
-It reads every session in `~/.claude/projects` and writes nothing. Here is what
-it prints on my own machine:
-
 ```
-  3266 sessions, 364.0M tokens of context
+  3289 sessions, 365.5M tokens of context
 
-  removed                   228.9M    63%  ████████████████··········
-  starting context          111.5M    31%  ████████··················
-  kept verbatim              23.7M     6%  ██························
+  removed                   229.3M    63%  ████████████████··········
+  starting context          112.3M    31%  ████████··················
+  kept verbatim              24.0M     7%  ██························
 
   removed is tool calls and their results.
   starting context is your MCP tools, skills, CLAUDE.md files and so on.
@@ -27,15 +22,15 @@ it prints on my own machine:
   your last 3 sessions
 
   session                                    now     after  starting  removed
-  a4abe3a1-d4e9-4c99-823d-2d7d947564ce      255k       86k       58k      66%
-  fda42bf1-66b1-496b-9913-cc0173ececa1       37k       37k       35k       0%
-  47fba1c4-36ff-4282-a992-473ede0c8660      755k      316k       50k      58%
+  a4abe3a1-d4e9-4c99-823d-2d7d947564ce      274k       87k       58k      68%
+  a8feeb50-76ad-424d-b150-df1e9185373d      998k      613k       49k      39%
+  0f729543-99e5-4e56-8d31-ef3bcd0a2b47      563k      179k       51k      68%
 
   after is what the session weighs once it has been supercompacted.
 
   Your newest session starts with 58k already loaded. (You should fix this btw)
 
-  435 of your sessions passed 200k tokens. The middle one drops by 87%.
+  436 of your sessions passed 200k tokens. The middle one drops by 87%.
   Your heaviest session held 1.0M tokens. 3k of it was the two of you talking.
 
   Context sizes are the numbers the API reported on each turn, not an estimate.
@@ -44,13 +39,68 @@ it prints on my own machine:
   Try it on this machine:  npx supercompact --preview
 ```
 
-## Install
+## Why
 
-```
+Tool traffic is almost everything in a Claude Code transcript. Files read, shell commands, test runs, and build logs account for roughly 95 percent of the variable tokens in a working session. The actual conversation is a small fraction of the file.
+
+When a session fills up, the default move is to abandon it and start a new one. You throw away the context, re-explain the architecture, and start over.
+
+I built this because I wanted long sessions that do not die. When you strip the tool calls, the session stops being disposable. You keep the agreements, the architectural decisions, and the conclusions the agent reached. The evidence is gone, but the context stays.
+
+## How this differs from `/compact`
+
+Claude Code has a built-in `/compact` command. That command sends your conversation to a model and asks for a summary. The original wording is replaced with a paraphrase, and detail is lost.
+
+`supercompact` does not use a model. It executes a direct rewrite of the JSONL session file on disk. Every human message and every assistant response stays character for character.
+
+## Usage
+
+Install globally or run it with `npx`.
+
+```bash
 npm install -g supercompact
 ```
 
-## Commands
+By default, `supercompact` creates a new session file and leaves your original transcript untouched:
+
+```bash
+supercompact
+```
+
+```
+kept 724 messages from you and 774 from Claude
+  was  3.4 MB, 233 tool calls
+  now  1.3 MB, about 180k tokens
+
+  new session  1f4df052-7cea-4af3-97fc-e990d7dd707c
+  resume it    cd '/Users/sauel/dev/agents' && claude --resume 1f4df052-7cea-4af3-97fc-e990d7dd707c
+
+  0f729543 was not touched.
+```
+
+To rewrite the current session under its existing ID and name:
+
+```bash
+supercompact --in-place
+```
+
+`--in-place` writes a full backup copy of the original file before modifying anything. It also leaves the trailing entries alone so an active turn continues working.
+
+Claude Code loads transcripts when it starts up. It does not monitor the file for changes while running. Resume the session to load the stripped state:
+
+```bash
+claude --resume <id>
+```
+
+To check the token reduction without writing anything:
+
+```bash
+supercompact --preview
+```
+
+## Reference
+
+### Commands
 
 ```
 supercompact                 copy the current session, stripped
@@ -59,18 +109,52 @@ supercompact --in-place      rewrite it, same id and name
 supercompact --preview       token cost, writes nothing
 supercompact measure         the split across all your sessions
 supercompact list            recent sessions
+supercompact help            show the help
+supercompact version         print the version
 ```
 
-## Options
+### Options
 
 ```
---tools            one line per tool call, no output
---keep-last N      keep the last N messages unchanged
+--tools            keep one line per tool call and drop the output
+--keep-last N      keep the newest N messages unchanged
 --keep-tools N     keep the newest N tool results
---unique-tools     a repeated call counts once
---json             machine-readable output
---limit N          how many sessions list shows
---project-dir P    look in P instead of the current directory
+--unique-tools     with --keep-tools, repeated identical calls count once
+--preview          print the token savings without writing any files
+--in-place         rewrite the session file instead of making a copy
+--json             output machine-readable JSON
+--limit N          number of sessions to display with list
+--project-dir P    look in project directory P instead of current directory
 ```
 
-MIT
+`<id>` is the first few characters of a session id, which `list` prints.
+
+## Inside Claude Code
+
+The repo includes a slash command and an agent skill under `agent/`. To install them:
+
+```bash
+cp agent/commands/supercompact.md ~/.claude/commands/
+cp -r agent/skills/supercompact ~/.claude/skills/
+```
+
+Run `/supercompact` inside a session to shrink the active transcript in place:
+
+```
+/supercompact [tools] [keep N] [preview]
+```
+
+- `tools` keeps the tool call names and removes the output.
+- `keep 10` leaves the last 10 messages unchanged.
+- `preview` calculates the savings without writing anything.
+- `copy` writes a new session instead of modifying the active file.
+
+The skill lets Claude Code measure its own transcript and strip tool traffic autonomously when asked.
+
+## Details
+
+- Node.js 18 or higher. Tested on Node 18 and 22 in CI.
+- Zero runtime dependencies.
+- 48 tests run against throwaway session trees in CI on macOS and Ubuntu.
+- Windows is untested.
+- MIT license. Author Adam Albastov. Source code on [GitHub](https://github.com/SignedAdam/supercompact).

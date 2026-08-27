@@ -1,8 +1,19 @@
 {
   "name": "supercompact",
   "version": "1.0.0",
-  "description": "Rewrite a Claude Code session down to what was actually said, and keep it resumable",
-  "keywords": ["claude", "claude-code", "context", "transcript", "session"],
+  "description": "Remove tool calls from Claude Code transcripts and keep the conversation resumable",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "context",
+    "compact",
+    "tokens",
+    "transcript",
+    "session",
+    "anthropic",
+    "coding-agent",
+    "token-reduction"
+  ],
   "license": "MIT",
   "author": "Adam Albastov",
   "repository": { "type": "git", "url": "git+https://github.com/SignedAdam/supercompact.git" },
