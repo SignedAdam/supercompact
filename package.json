@@ -1,6 +1,6 @@
 {
   "name": "supercompact",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Cut up to 95% of tokens from Claude Code sessions without losing conversation history",
   "keywords": [
     "claude-code",

@@ -128,7 +128,7 @@ supercompact version         print the version
 ### Options
 
 ```
---tools            keep one line per tool call and drop the output
+--no-tools         drop the calls without recording what ran
 --keep-last N      keep the newest N messages unchanged
 --keep-tools N     keep the newest N tool results
 --unique-tools     with --keep-tools, repeated identical calls count once
@@ -167,7 +167,7 @@ Run `/supercompact` inside a session to shrink the active transcript in place:
 /supercompact [tools] [keep N] [preview]
 ```
 
-- `tools` keeps the tool call names and removes the output.
+- `tools` is the default: the call names stay, the output goes.
 - `keep 10` leaves the last 10 messages unchanged.
 - `preview` calculates the savings without writing anything.
 - `copy` writes a new session instead of modifying the active file.
@@ -178,6 +178,6 @@ The skill lets Claude Code measure its own transcript and strip tool traffic aut
 
 - Node.js 18 or higher. Tested on Node 18 and 22 in CI.
 - Zero runtime dependencies.
-- 57 tests run against throwaway session trees in CI on macOS and Ubuntu.
+- 60 tests run against throwaway session trees in CI on macOS and Ubuntu.
 - Windows is untested.
 - MIT license. Author Adam Albastov. Source code on [GitHub](https://github.com/SignedAdam/supercompact).

@@ -18,13 +18,14 @@ import {
 } from './measure.js';
 import * as store from './store.js';
 
-const version = '1.0.1';
+const version = '1.1.0';
 
 // Every option the tool accepts. Anything else is a typo, and a typo that is
 // ignored without a word is worse than one that stops: --keep-tool 5 would
 // quietly keep nothing at all.
 const known = new Set([
   'tools',
+  'no-tools',
   'keep-last',
   'keep-tools',
   'unique-tools',
@@ -173,7 +174,10 @@ function open(args: Args): { transcript: Transcript; cwd: string } {
 
 function options(args: Args): Options {
   return {
-    toolLines: has(args, 'tools'),
+    // A line per call is the default: a session with neither the calls nor the
+    // results in it reads as an agent that answered from memory, and the model
+    // reading it back copies that. `--no-tools` is the old behaviour.
+    toolLines: !has(args, 'no-tools'),
     keep: {
       lastMessages: number(args, 'keep-last'),
       toolCalls: number(args, 'keep-tools'),
@@ -200,6 +204,7 @@ function nextTitle(current: string): string {
 function heldNote(result: Result): string {
   const parts: string[] = [];
   if (result.toolLines > 0) parts.push(`${result.toolLines} tool lines`);
+  if (result.merged > 0) parts.push(`${result.merged} turns joined`);
   if (result.keptCalls > 0) parts.push(`${result.keptCalls} tool results kept whole`);
   return parts.length === 0 ? '' : ', ' + parts.join(', ');
 }
@@ -705,11 +710,13 @@ USAGE
 
 WHAT IT DOES
   Every human message and assistant response stays character for character.
-  Tool calls, command outputs, file reads, and logs are deleted.
+  Command outputs, file reads and logs are deleted; each call it removes leaves
+  one line saying what ran, so the history still shows how the work was done.
+  Assistant turns left adjacent by a removed result are joined into one.
   No language model is used.
 
 OPTIONS
-  --tools            keep one line per tool call and drop the output
+  --no-tools         drop the calls without recording what ran
   --keep-last N      keep the newest N messages unchanged
   --keep-tools N     keep the newest N tool results
   --unique-tools     with --keep-tools, repeated identical calls count once

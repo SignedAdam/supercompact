@@ -111,11 +111,49 @@ check "the copy carries its new size" $?
 check "the original is byte for byte unchanged" $?
 
 # --- tool lines ---
+grep -q 'You used tool Bash(command: go build' "$(copy_of)"
+check "a plain run records every call it removed" $?
+
 setup
 $BIN 070e7a0c --tools > /dev/null
 grep -q 'You used tool Bash(command: go build' "$(copy_of)"
 check "--tools writes the call out as a line" $?
 grep -q 'SECRETOUTPUT' "$(copy_of)" && bad "--tools leaked output" || ok "--tools still drops the output"
+
+setup
+$BIN 070e7a0c --no-tools > /dev/null
+grep -q 'You used tool Bash' "$(copy_of)" && bad "--no-tools still wrote a line" || ok "--no-tools drops the calls silently"
+
+# --- joined turns ---
+# A removed result takes the user turn that carried it, and the API refuses two
+# assistant turns in a row. Whatever survives has to alternate.
+SPLIT=bbbbbbbb-1111-2222-3333-444455556666
+setup
+cat > "$SESSIONS/$SPLIT.jsonl" <<EOF
+{"type":"user","uuid":"s1","parentUuid":null,"sessionId":"$SPLIT","cwd":"$PROJ","timestamp":"2026-08-05T00:00:00.000Z","message":{"role":"user","content":"Fix the build"}}
+{"type":"assistant","uuid":"s2","parentUuid":"s1","sessionId":"$SPLIT","cwd":"$PROJ","message":{"id":"m1","role":"assistant","stop_reason":"end_turn","content":[{"type":"text","text":"Reading it first."}]}}
+{"type":"assistant","uuid":"s3","parentUuid":"s2","sessionId":"$SPLIT","cwd":"$PROJ","message":{"id":"m2","role":"assistant","stop_reason":"tool_use","content":[{"type":"tool_use","id":"s_t1","name":"Bash","input":{"command":"go build ./..."}}]}}
+{"type":"user","uuid":"s4","parentUuid":"s3","sessionId":"$SPLIT","cwd":"$PROJ","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"s_t1","content":"THIRDOUTPUT"}]}}
+{"type":"assistant","uuid":"s5","parentUuid":"s4","sessionId":"$SPLIT","cwd":"$PROJ","message":{"id":"m3","role":"assistant","stop_reason":"end_turn","content":[{"type":"text","text":"Fixed."}]}}
+EOF
+$BIN bbbbbbbb --no-tools > /dev/null
+python3 - "$(copy_of)" <<'PYX'
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+kinds = [r.get("type") for r in rows]
+for a, b in zip(kinds, kinds[1:]):
+    if a == "assistant" and b == "assistant":
+        sys.exit("two assistant turns in a row: " + str(kinds))
+said = " ".join(
+    b.get("text", "")
+    for r in rows
+    if r.get("type") == "assistant"
+    for b in (r.get("message") or {}).get("content", [])
+)
+if "Reading it first." not in said or "Fixed." not in said:
+    sys.exit("a joined turn lost what it said: " + said)
+PYX
+check "assistant turns left adjacent are joined, keeping their words" $?
 
 # --- keeping ---
 setup

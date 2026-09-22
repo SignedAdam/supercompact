@@ -11,7 +11,11 @@ export interface Options {
   keep: Keep;
 }
 
-export const defaultOptions: Options = { toolLines: false, keep: noKeep };
+// Tool lines are on by default. Without them a reduced session says an agent
+// answered everything from memory: the calls are gone, the results are gone,
+// and the prose left behind still reports what they found. A line per call
+// costs about fifteen tokens and keeps the history honest.
+export const defaultOptions: Options = { toolLines: true, keep: noKeep };
 
 export interface Result {
   jsonl: string;
@@ -22,6 +26,8 @@ export interface Result {
   keptCalls: number;
   dropped: number;
   preservedTail: number;
+  /** Assistant turns folded into the turn before them. */
+  merged: number;
 }
 
 function emptyResult(sessionId = ''): Result {
@@ -34,6 +40,7 @@ function emptyResult(sessionId = ''): Result {
     keptCalls: 0,
     dropped: 0,
     preservedTail: 0,
+    merged: 0,
   };
 }
 
@@ -47,15 +54,47 @@ class Builder {
   parent: string | null = null;
   written = new Set<string>();
   notes: string[] = [];
+  /** The assistant turn written last, while nothing has been written after it. */
+  lastAssistant: { record: Record_; line: number } | undefined;
 
   constructor(readonly result: Result) {}
 
   emit(record: Record_, uuid: string): boolean {
     this.lines.push(encode(record));
+    this.lastAssistant = undefined;
     if (uuid !== '') {
       this.parent = uuid;
       this.written.add(uuid);
     }
+    return true;
+  }
+
+  /** An assistant turn, folded into the one before it when they are adjacent.
+   *
+   * Dropping tool results takes the user turns that carried them, because a
+   * result is not a role of its own: the API reads it inside a user message.
+   * Two assistant turns with nothing between them is not a conversation the
+   * API accepts, so whoever sends this next has to invent a user turn to fill
+   * the gap. Folding them leaves no gap to fill.
+   *
+   * Returns false when the turn was folded away rather than written. */
+  emitAssistant(record: Record_, uuid: string): boolean {
+    const previous = this.lastAssistant;
+    const left = previous !== undefined && isRecord(previous.record.message) ? previous.record.message : undefined;
+    const right = isRecord(record.message) ? record.message : undefined;
+    if (previous !== undefined && left !== undefined && right !== undefined) {
+      if (Array.isArray(left.content) && Array.isArray(right.content)) {
+        left.content = [...left.content, ...right.content];
+        // The later turn ends the merged one, so its stop reason is the one
+        // that describes where the agent actually stopped.
+        if (right.stop_reason !== undefined) left.stop_reason = right.stop_reason;
+        this.lines[previous.line] = encode(previous.record);
+        this.result.merged++;
+        return false;
+      }
+    }
+    this.emit(record, uuid);
+    this.lastAssistant = { record, line: this.lines.length - 1 };
     return true;
   }
 
@@ -226,8 +265,7 @@ export function fork(transcript: Transcript, options: Options = defaultOptions):
     delete message.stop_details;
     delete record.requestId;
     record.message = message;
-    b.emit(record, uuid);
-    b.result.assistants++;
+    if (b.emitAssistant(record, uuid)) b.result.assistants++;
 
     b.notes = notes;
     if (!keptCall) b.flushNotes(entry.data, sessionId);
@@ -331,8 +369,7 @@ export function inPlace(transcript: Transcript, options: Options = defaultOption
     delete message.stop_details;
     delete record.requestId;
     record.message = message;
-    b.emit(record, entry.uuid);
-    b.result.assistants++;
+    if (b.emitAssistant(record, entry.uuid)) b.result.assistants++;
 
     b.notes = notes;
     if (!keptCall) b.flushNotes(entry.data, '');
